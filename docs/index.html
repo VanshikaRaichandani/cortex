@@ -353,6 +353,7 @@
       <a class="btn-ghost" href="#how">See how it works</a>
     </div>
     <div class="hero-foot"><span class="mark">¹</span> every answer traces back to a page</div>
+    <div class="hero-foot"><span class="mark">²</span> runs on a free tier — first open after a while may take ~30s to wake up</div>
   </section>
 
   <section id="how">
@@ -464,16 +465,13 @@
 </script>
 <script>
   // ---- Swap this for your deployed Streamlit app URL once it's live ----
-  const APP_URL = "https://cortex-rag-chatbot.streamlit.app/";
+ const APP_URL = "https://cortex-rag-chatbot.streamlit.app";
 
-  // Route through loading.html so a cold-started free-tier host shows a
-  // proper splash instead of a blank tab while it wakes up. Locally this
-  // just resolves almost instantly and redirects straight through.
-  const LAUNCH_URL = `loading.html?to=${encodeURIComponent(APP_URL)}`;
-  document.getElementById('launch-link').href = LAUNCH_URL;
-  document.getElementById('launch-link-2').href = LAUNCH_URL;
-  document.getElementById('launch-link').target = '_blank';
-  document.getElementById('launch-link-2').target = '_blank';
+// Linking straight to the app — no loading-page detour.
+document.getElementById('launch-link').href = APP_URL;
+document.getElementById('launch-link-2').href = APP_URL;
+document.getElementById('launch-link').target = '_blank';
+document.getElementById('launch-link-2').target = '_blank';
 
   // ---------------------------------------------------------------------
   // Immersive background, reskinned to the evidence-board idea: a small
