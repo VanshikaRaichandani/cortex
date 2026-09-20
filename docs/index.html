@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cortex — chat with your documents</title>
+<meta name="description" content="Cortex is a retrieval-augmented chatbot that answers questions using only the documents you give it, with citations back to the source passage." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,340;0,480;0,600;1,400;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0E14;
+    --bg-panel: #11151C;
+    --line: #232A36;
+    --text: #E7ECF2;
+    --text-dim: #8CA0B3;
+    --teal: #00D9B5;
+    --ember: #FF6B4A;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    line-height: 1.55;
+    overflow-x: hidden;
+  }
+
+  #scene-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .content { position: relative; z-index: 1; }
+
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 26px 52px;
+    background: linear-gradient(to bottom, rgba(23,19,15,0.92), transparent);
+  }
+
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.35rem;
+    color: var(--text);
+  }
+  .logo .dot { color: var(--teal); }
+
+  nav a.launch {
+    color: var(--bg);
+    background: var(--teal);
+    padding: 10px 20px;
+    border-radius: 2px;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.88rem;
+    letter-spacing: 0.01em;
+    display: inline-block;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  nav a.launch:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -8px rgba(0, 217, 181, 0.5);
+  }
+
+  .logo .dot { transition: transform 0.3s ease; display: inline-block; }
+  .logo:hover .dot { transform: scale(1.4); }
+
+  section { padding: 130px 52px; max-width: 1080px; margin: 0 auto; }
+
+  /* ---------- hero ---------- */
+  .hero {
+    min-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding-top: 130px;
+    padding-bottom: 40px;
+    perspective: 900px;
+  }
+
+  .hero h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 480;
+    font-size: clamp(2.8rem, 6.4vw, 5rem);
+    line-height: 1.08;
+    max-width: 15ch;
+    letter-spacing: -0.01em;
+    margin: 0 auto;
+    transform-style: preserve-3d;
+    transition: transform 0.15s ease-out;
+    will-change: transform;
+  }
+
+  .hero p.sub {
+    margin: 30px auto 0;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.3rem;
+    color: var(--text-dim);
+    max-width: 44ch;
+    line-height: 1.6;
+  }
+
+  .hero .cta-row { margin-top: 44px; display: flex; gap: 18px; align-items: center; justify-content: center; }
+
+  .btn-primary {
+    background: var(--teal);
+    color: var(--bg);
+    padding: 15px 28px;
+    border-radius: 2px;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+    display: inline-block;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px -10px rgba(0, 217, 181, 0.55);
+  }
+
+  .btn-ghost {
+    color: var(--text);
+    border: 1px solid var(--line);
+    padding: 14px 26px;
+    border-radius: 2px;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+    display: inline-block;
+    transition: transform 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+  }
+  .btn-ghost:hover {
+    transform: translateY(-2px);
+    border-color: var(--teal);
+    color: var(--teal);
+  }
+
+  .hero-foot {
+    margin-top: 56px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-foot .mark { color: var(--ember); font-family: 'Fraunces', serif; font-style: italic; }
+
+  /* ---------- section titles ---------- */
+  #how { padding-top: 40px; }
+
+  h2.section-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 480;
+    font-size: clamp(1.9rem, 3.2vw, 2.5rem);
+    letter-spacing: -0.01em;
+    max-width: 18ch;
+  }
+
+  .section-lede {
+    margin-top: 18px;
+    color: var(--text-dim);
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 1.08rem;
+    max-width: 46ch;
+    line-height: 1.6;
+  }
+
+  /* ---------- steps as index cards ---------- */
+  .steps { margin-top: 68px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  @media (max-width: 800px) { .steps { grid-template-columns: 1fr; } }
+
+  .step {
+    background: var(--bg);
+    padding: 34px 30px;
+    transition: background 0.3s ease;
+  }
+  .step:hover { background: var(--bg-panel); }
+  .step .num {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ember);
+    font-size: 1.5rem;
+    display: inline-block;
+    transition: transform 0.3s ease;
+  }
+  .step:hover .num { transform: translateX(4px); }
+  .step h3 { margin-top: 16px; font-size: 1.1rem; font-weight: 600; letter-spacing: -0.005em; }
+  .step p { margin-top: 10px; color: var(--text-dim); font-size: 0.94rem; line-height: 1.6; }
+
+  /* ---------- pipeline as a reference list ---------- */
+  .grid-two { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 72px; align-items: start; margin-top: 68px; }
+  @media (max-width: 800px) { .grid-two { grid-template-columns: 1fr; } }
+
+  .reference-list { border-top: 1px solid var(--line); }
+  .reference-list .entry {
+    display: grid;
+    grid-template-columns: 2.2em 1fr;
+    gap: 14px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--line);
+    transition: padding-left 0.25s ease, background 0.25s ease;
+  }
+  .reference-list .entry:hover {
+    padding-left: 12px;
+    background: var(--bg-panel);
+  }
+  .reference-list .entry .idx {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    color: var(--ember);
+    font-size: 1rem;
+  }
+  .reference-list .entry .body { font-size: 0.94rem; color: var(--text); }
+  .reference-list .entry .body span { color: var(--text-dim); }
+
+  /* ---------- honest note as a margin annotation ---------- */
+  .honest-note {
+    margin-top: 110px;
+    padding-left: 26px;
+    border-left: 1px solid var(--ember);
+  }
+  .honest-note h3 {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--text);
+    font-size: 1.15rem;
+  }
+  .honest-note p {
+    margin-top: 12px;
+    color: var(--text-dim);
+    font-size: 0.98rem;
+    max-width: 58ch;
+    line-height: 1.65;
+  }
+
+  footer {
+    padding: 70px 52px 60px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    color: var(--text-dim);
+    font-size: 0.88rem;
+  }
+  footer a { color: var(--text-dim); text-decoration: none; }
+
+  .btn-primary, .btn-ghost, nav a.launch {
+    transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -8px rgba(0, 217, 181, 0.45);
+  }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-ghost:hover { border-color: var(--teal); color: var(--teal); transform: translateY(-2px); }
+  .btn-ghost:active { transform: translateY(0); }
+  nav a.launch:hover { transform: translateY(-2px); box-shadow: 0 8px 20px -8px rgba(0, 217, 181, 0.45); }
+
+  .logo .dot { display: inline-block; transition: transform 0.3s ease; }
+  .logo:hover .dot { transform: scale(1.4); }
+
+  .step { transition: background 0.3s ease; cursor: default; }
+  .step:hover { background: var(--bg-panel); }
+  .step:hover .num { color: var(--teal); }
+  .step .num { transition: color 0.3s ease; }
+
+  .reference-list .entry { transition: background 0.25s ease, padding-left 0.25s ease; }
+  .reference-list .entry:hover { background: var(--bg-panel); padding-left: 10px; }
+  .reference-list .entry:hover .idx { color: var(--teal); }
+  .reference-list .entry .idx { transition: color 0.25s ease; }
+
+  footer a { position: relative; }
+  footer a::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: -3px;
+    width: 0; height: 1px;
+    background: var(--text-dim);
+    transition: width 0.25s ease;
+  }
+  footer a:hover::after { width: 100%; }
+
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.is-visible { opacity: 1; transform: translateY(0); }
+  .steps .step:nth-child(1) { transition-delay: 0s; }
+  .steps .step:nth-child(2) { transition-delay: 0.1s; }
+  .steps .step:nth-child(3) { transition-delay: 0.2s; }
+
+  #cursor-glow {
+    position: fixed;
+    top: 0; left: 0;
+    width: 460px; height: 460px;
+    margin-left: -230px; margin-top: -230px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 217, 181, 0.13), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  #cursor-glow.active { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+    .hero h1 { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="scene-canvas"></canvas>
+<div id="cursor-glow"></div>
+
+<div class="content">
+
+  <nav>
+    <div class="logo">Cortex<span class="dot">.</span></div>
+    <a class="launch" href="#" id="launch-link">Open the app</a>
+  </nav>
+
+  <section class="hero" id="hero">
+    <h1 id="hero-title">Ask your documents anything they actually say.</h1>
+    <p class="sub">
+      Upload what you have. Get answers pulled from those exact pages —
+      never a guess dressed up as one.
+    </p>
+    <div class="cta-row">
+      <a class="btn-primary" href="#" id="launch-link-2">Open the app</a>
+      <a class="btn-ghost" href="#how">See how it works</a>
+    </div>
+    <div class="hero-foot"><span class="mark">¹</span> every answer traces back to a page</div>
+  </section>
+
+  <section id="how">
+    <h2 class="section-title reveal">Three steps, no magic in between.</h2>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="num">¹</div>
+        <h3>Upload</h3>
+        <p>Drop in PDFs, Word docs, or plain text. Nothing is sent anywhere until you ask a question.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">²</div>
+        <h3>Index</h3>
+        <p>Each file is split into overlapping passages and turned into embeddings, stored in a vector database scoped to your session only.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">³</div>
+        <h3>Ask</h3>
+        <p>Your question is matched against the most relevant passages, and the model answers using only what it retrieved — with the source cited.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title reveal">What's actually running under the hood</h2>
+    <p class="section-lede reveal">No proprietary black box — a fairly standard retrieval pipeline, kept plain enough to explain end to end.</p>
+
+    <div class="grid-two">
+      <div class="reveal">
+        <p style="color:var(--text-dim); font-family:'Fraunces',serif; font-style:italic; font-size:1.05rem; line-height:1.6; max-width:40ch;">
+          Six stages, laid out the way a reference list would be — because
+          that's essentially what retrieval is doing at query time.
+        </p>
+      </div>
+      <div class="reference-list reveal">
+        <div class="entry"><div class="idx">¹</div><div class="body">Text extraction <span>— pypdf, python-docx</span></div></div>
+        <div class="entry"><div class="idx">²</div><div class="body">Chunking <span>— overlapping word windows</span></div></div>
+        <div class="entry"><div class="idx">³</div><div class="body">Embeddings <span>— local sentence-transformers model</span></div></div>
+        <div class="entry"><div class="idx">⁴</div><div class="body">Vector search <span>— Chroma, per-session collection</span></div></div>
+        <div class="entry"><div class="idx">⁵</div><div class="body">Generation <span>— Gemini 2.5 Flash, grounded on retrieved chunks</span></div></div>
+        <div class="entry"><div class="idx">⁶</div><div class="body">Interface <span>— Streamlit</span></div></div>
+      </div>
+    </div>
+
+    <div class="honest-note reveal">
+      <h3>Where this breaks</h3>
+      <p>
+        It only knows what you uploaded — it won't answer general knowledge
+        questions well, and it can still misread a passage or miss context
+        split across chunks. Documents aren't stored after your session ends.
+        It's a portfolio project, not a production tool.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <div>Cortex — a retrieval-augmented chatbot, built end to end.</div>
+    <div><a href="#">GitHub</a></div>
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-visible');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.2, rootMargin: '0px 0px -60px 0px' });
+
+  document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
+
+  // Soft glow that trails the cursor, lagged for a smoother feel.
+  const glow = document.getElementById('cursor-glow');
+  let glowTargetX = window.innerWidth / 2, glowTargetY = window.innerHeight / 2;
+  let glowX = glowTargetX, glowY = glowTargetY;
+  window.addEventListener('mousemove', (e) => {
+    glowTargetX = e.clientX;
+    glowTargetY = e.clientY;
+    glow.classList.add('active');
+  });
+  window.addEventListener('mouseleave', () => glow.classList.remove('active'));
+  function moveGlow() {
+    glowX += (glowTargetX - glowX) * 0.12;
+    glowY += (glowTargetY - glowY) * 0.12;
+    glow.style.transform = `translate(${glowX}px, ${glowY}px)`;
+    requestAnimationFrame(moveGlow);
+  }
+  moveGlow();
+
+  // Subtle cursor tilt on the hero headline — a few degrees, not a gimmick.
+  const heroReduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const heroSection = document.getElementById('hero');
+  const heroTitle = document.getElementById('hero-title');
+  if (heroSection && heroTitle && !heroReduceMotion) {
+    heroSection.addEventListener('mousemove', (e) => {
+      const rect = heroSection.getBoundingClientRect();
+      const px = (e.clientX - rect.left) / rect.width - 0.5;
+      const py = (e.clientY - rect.top) / rect.height - 0.5;
+      heroTitle.style.transform = `rotateY(${px * 6}deg) rotateX(${-py * 6}deg)`;
+    });
+    heroSection.addEventListener('mouseleave', () => {
+      heroTitle.style.transform = 'rotateY(0deg) rotateX(0deg)';
+    });
+  }
+</script>
+<script>
+  // ---- Swap this for your deployed Streamlit app URL once it's live ----
+  const APP_URL = "http://localhost:8501";
+
+  // Route through loading.html so a cold-started free-tier host shows a
+  // proper splash instead of a blank tab while it wakes up. Locally this
+  // just resolves almost instantly and redirects straight through.
+  const LAUNCH_URL = `loading.html?to=${encodeURIComponent(APP_URL)}`;
+  document.getElementById('launch-link').href = LAUNCH_URL;
+  document.getElementById('launch-link-2').href = LAUNCH_URL;
+  document.getElementById('launch-link').target = '_blank';
+  document.getElementById('launch-link-2').target = '_blank';
+
+  // ---------------------------------------------------------------------
+  // Immersive background, reskinned to the evidence-board idea: a small
+  // bright core (your documents) in warm gold, orbited by a wide field of
+  // dim paper-toned nodes (candidate passages). Every few seconds, one
+  // oxblood thread fires from a field node into the core — a passage
+  // getting pulled in and cited at query time.
+  // ---------------------------------------------------------------------
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const canvas = document.getElementById('scene-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.z = 22;
+
+  const world = new THREE.Group();
+  scene.add(world);
+
+  const FIELD_COUNT = 200;
+  const SPREAD = 18;
+  const LINK_DIST = 3.2;
+
+  const fieldPositions = new Float32Array(FIELD_COUNT * 3);
+  const fieldVelocities = [];
+  for (let i = 0; i < FIELD_COUNT; i++) {
+    fieldPositions[i * 3] = (Math.random() - 0.5) * SPREAD * 2;
+    fieldPositions[i * 3 + 1] = (Math.random() - 0.5) * SPREAD * 1.4;
+    fieldPositions[i * 3 + 2] = (Math.random() - 0.5) * SPREAD;
+    fieldVelocities.push(new THREE.Vector3(
+      (Math.random() - 0.5) * 0.004,
+      (Math.random() - 0.5) * 0.004,
+      (Math.random() - 0.5) * 0.004
+    ));
+  }
+
+  const fieldGeo = new THREE.BufferGeometry();
+  fieldGeo.setAttribute('position', new THREE.BufferAttribute(fieldPositions, 3));
+  const fieldMat = new THREE.PointsMaterial({ color: 0x8CA0B3, size: 0.08, transparent: true, opacity: 0.5 });
+  const fieldPoints = new THREE.Points(fieldGeo, fieldMat);
+  world.add(fieldPoints);
+
+  const lineGeo = new THREE.BufferGeometry();
+  const maxLineVerts = FIELD_COUNT * 12 * 2;
+  const linePositions = new Float32Array(maxLineVerts * 3);
+  lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x232A36, transparent: true, opacity: 0.6 });
+  const lines = new THREE.LineSegments(lineGeo, lineMat);
+  world.add(lines);
+
+  const CORE_COUNT = 14;
+  const CORE_RADIUS = 2.6;
+  const corePositions = new Float32Array(CORE_COUNT * 3);
+  for (let i = 0; i < CORE_COUNT; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos((Math.random() * 2) - 1);
+    const r = CORE_RADIUS * (0.5 + Math.random() * 0.5);
+    corePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    corePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    corePositions[i * 3 + 2] = r * Math.cos(phi);
+  }
+  const coreGeo = new THREE.BufferGeometry();
+  coreGeo.setAttribute('position', new THREE.BufferAttribute(corePositions, 3));
+  const coreMat = new THREE.PointsMaterial({ color: 0x5FF0D4, size: 0.15, transparent: true, opacity: 0.95 });
+  const corePoints = new THREE.Points(coreGeo, coreMat);
+  world.add(corePoints);
+
+  const pulseGeo = new THREE.BufferGeometry();
+  const pulsePositions = new Float32Array(6);
+  pulseGeo.setAttribute('position', new THREE.BufferAttribute(pulsePositions, 3));
+  const pulseMat = new THREE.LineBasicMaterial({ color: 0xFF6B4A, transparent: true, opacity: 0 });
+  const pulseLine = new THREE.Line(pulseGeo, pulseMat);
+  world.add(pulseLine);
+
+  let pulseStart = 0;
+  const PULSE_EVERY = 4200;
+  const PULSE_DURATION = 1100;
+
+  function firePulse(now) {
+    const fieldIdx = Math.floor(Math.random() * FIELD_COUNT);
+    const coreIdx = Math.floor(Math.random() * CORE_COUNT);
+    pulsePositions[0] = fieldPositions[fieldIdx * 3];
+    pulsePositions[1] = fieldPositions[fieldIdx * 3 + 1];
+    pulsePositions[2] = fieldPositions[fieldIdx * 3 + 2];
+    pulsePositions[3] = corePositions[coreIdx * 3];
+    pulsePositions[4] = corePositions[coreIdx * 3 + 1];
+    pulsePositions[5] = corePositions[coreIdx * 3 + 2];
+    pulseGeo.attributes.position.needsUpdate = true;
+    pulseStart = now;
+  }
+
+  let mouseX = 0, mouseY = 0;
+  window.addEventListener('mousemove', (e) => {
+    mouseX = (e.clientX / window.innerWidth - 0.5);
+    mouseY = (e.clientY / window.innerHeight - 0.5);
+  });
+
+  let scrollFrac = 0;
+  window.addEventListener('scroll', () => {
+    const max = document.body.scrollHeight - window.innerHeight;
+    scrollFrac = max > 0 ? window.scrollY / max : 0;
+  });
+
+  function updateLinks() {
+    let vertIndex = 0;
+    for (let i = 0; i < FIELD_COUNT && vertIndex < maxLineVerts - 2; i++) {
+      const ax = fieldPositions[i * 3], ay = fieldPositions[i * 3 + 1], az = fieldPositions[i * 3 + 2];
+      for (let j = i + 1; j < FIELD_COUNT && vertIndex < maxLineVerts - 2; j++) {
+        const bx = fieldPositions[j * 3], by = fieldPositions[j * 3 + 1], bz = fieldPositions[j * 3 + 2];
+        const dx = ax - bx, dy = ay - by, dz = az - bz;
+        if (dx * dx + dy * dy + dz * dz < LINK_DIST * LINK_DIST) {
+          linePositions[vertIndex * 3] = ax;
+          linePositions[vertIndex * 3 + 1] = ay;
+          linePositions[vertIndex * 3 + 2] = az;
+          linePositions[(vertIndex + 1) * 3] = bx;
+          linePositions[(vertIndex + 1) * 3 + 1] = by;
+          linePositions[(vertIndex + 1) * 3 + 2] = bz;
+          vertIndex += 2;
+        }
+      }
+    }
+    lineGeo.setDrawRange(0, vertIndex);
+    lineGeo.attributes.position.needsUpdate = true;
+  }
+
+  let lastPulseCheck = performance.now();
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+
+    for (let i = 0; i < FIELD_COUNT; i++) {
+      fieldPositions[i * 3] += fieldVelocities[i].x;
+      fieldPositions[i * 3 + 1] += fieldVelocities[i].y;
+      fieldPositions[i * 3 + 2] += fieldVelocities[i].z;
+      for (let axis = 0; axis < 3; axis++) {
+        const limit = axis === 1 ? SPREAD * 0.7 : SPREAD;
+        if (Math.abs(fieldPositions[i * 3 + axis]) > limit) {
+          fieldVelocities[i].setComponent(axis, -fieldVelocities[i].getComponent(axis));
+        }
+      }
+    }
+    fieldGeo.attributes.position.needsUpdate = true;
+    updateLinks();
+
+    if (!reduceMotion) {
+      world.rotation.y += 0.0006;
+      corePoints.rotation.y -= 0.0016;
+      corePoints.rotation.x += 0.0009;
+
+      if (now - lastPulseCheck > PULSE_EVERY) {
+        firePulse(now);
+        lastPulseCheck = now;
+      }
+      const pulseElapsed = now - pulseStart;
+      if (pulseElapsed >= 0 && pulseElapsed < PULSE_DURATION) {
+        const t = pulseElapsed / PULSE_DURATION;
+        pulseMat.opacity = Math.sin(t * Math.PI) * 0.9;
+      } else {
+        pulseMat.opacity = 0;
+      }
+    }
+
+    camera.position.x += (mouseX * 4 - camera.position.x) * 0.02;
+    camera.position.y += (-mouseY * 3 - camera.position.y) * 0.02;
+    world.rotation.z = scrollFrac * 0.12;
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(animate);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+
+</body>
+</html>

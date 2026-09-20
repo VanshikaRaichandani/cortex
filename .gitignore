@@ -1,0 +1,15 @@
+# secrets — never commit your actual key
+.env
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# streamlit local cache
+.streamlit/secrets.toml
+
+# OS junk
+.DS_Store
+Thumbs.db

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cortex — opening the app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,480;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0E14;
+    --bg-panel: #11151C;
+    --line: #232A36;
+    --text: #E7ECF2;
+    --text-dim: #8CA0B3;
+    --teal: #00D9B5;
+    --ember: #FF6B4A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  #scene-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    cursor: grab;
+  }
+  #scene-canvas:active { cursor: grabbing; }
+
+  .wrap { position: relative; z-index: 1; max-width: 420px; padding: 24px; }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 480;
+    font-size: 1.7rem;
+    margin-bottom: 14px;
+    text-shadow: 0 2px 24px rgba(0,0,0,0.6);
+  }
+
+  p.status {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.65;
+    text-shadow: 0 2px 16px rgba(0,0,0,0.6);
+  }
+
+  .note {
+    margin-top: 28px;
+    padding: 16px 18px;
+    text-align: left;
+    background: rgba(17, 21, 28, 0.82);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-size: 0.86rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .note b { color: var(--text); }
+
+  .go {
+    display: inline-block;
+    margin-top: 28px;
+    color: var(--bg);
+    background: var(--teal);
+    padding: 12px 24px;
+    border-radius: 2px;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .go:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -10px rgba(0, 217, 181, 0.55); }
+
+  @media (prefers-reduced-motion: reduce) {
+    #scene-canvas { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="scene-canvas"></canvas>
+
+<div class="wrap">
+  <h1>Opening Cortex</h1>
+  <p class="status">Taking you there shortly — drag to look around, or click anywhere.</p>
+
+  <div class="note">
+    This app runs on Streamlit Community Cloud's free tier, which puts it
+    to sleep after a while unused. If you land on a <b>"this app has gone
+    to sleep"</b> screen instead of the chat, click its <b>wake it back
+    up</b> button and give it 20–30 seconds — that's expected, not broken.
+  </div>
+
+  <a class="go" href="#" id="go-now">Go now</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const target = params.get('to');
+  const goLink = document.getElementById('go-now');
+  const statusEl = document.querySelector('.status');
+
+  if (!target) {
+    statusEl.textContent = "No app URL was given.";
+    goLink.style.display = 'none';
+  } else {
+    goLink.href = target;
+
+    // Don't redirect out from under someone mid-interaction: reset the
+    // timer on drag activity, but cap the total wait so it never stalls
+    // indefinitely if someone just keeps fiddling with the scene.
+    let lastInteraction = 0;
+    const pageLoadTime = performance.now();
+    window.addEventListener('pointerdown', () => { lastInteraction = performance.now(); });
+    window.addEventListener('pointermove', () => { lastInteraction = performance.now(); });
+
+    const MIN_WAIT = 3000;
+    const IDLE_BEFORE_GO = 1200;
+    const MAX_WAIT = 9000;
+
+    const checkTimer = setInterval(() => {
+      const now = performance.now();
+      const sincePageLoad = now - pageLoadTime;
+      const sinceInteraction = now - lastInteraction;
+      const idleEnough = lastInteraction === 0 || sinceInteraction > IDLE_BEFORE_GO;
+      if ((sincePageLoad > MIN_WAIT && idleEnough) || sincePageLoad > MAX_WAIT) {
+        clearInterval(checkTimer);
+        window.location.href = target;
+      }
+    }, 200);
+  }
+</script>
+<script>
+  // A compact version of the landing page's evidence-board scene, scaled
+  // up in motion since this page is only on screen for a few seconds —
+  // the core spins faster and pulses fire more often here than on the
+  // landing page itself, so there's something to actually watch.
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduceMotion) {
+    const canvas = document.getElementById('scene-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.z = 14;
+
+    const world = new THREE.Group();
+    scene.add(world);
+
+    const FIELD_COUNT = 90;
+    const SPREAD = 9;
+    const LINK_DIST = 2.6;
+
+    const fieldPositions = new Float32Array(FIELD_COUNT * 3);
+    const fieldVelocities = [];
+    for (let i = 0; i < FIELD_COUNT; i++) {
+      fieldPositions[i * 3] = (Math.random() - 0.5) * SPREAD * 2;
+      fieldPositions[i * 3 + 1] = (Math.random() - 0.5) * SPREAD * 1.3;
+      fieldPositions[i * 3 + 2] = (Math.random() - 0.5) * SPREAD;
+      fieldVelocities.push(new THREE.Vector3(
+        (Math.random() - 0.5) * 0.01,
+        (Math.random() - 0.5) * 0.01,
+        (Math.random() - 0.5) * 0.01
+      ));
+    }
+    const fieldGeo = new THREE.BufferGeometry();
+    fieldGeo.setAttribute('position', new THREE.BufferAttribute(fieldPositions, 3));
+    const fieldMat = new THREE.PointsMaterial({ color: 0x00D9B5, size: 0.09, transparent: true, opacity: 0.6 });
+    const fieldPoints = new THREE.Points(fieldGeo, fieldMat);
+    world.add(fieldPoints);
+
+    const lineGeo = new THREE.BufferGeometry();
+    const maxLineVerts = FIELD_COUNT * 10 * 2;
+    const linePositions = new Float32Array(maxLineVerts * 3);
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x232A36, transparent: true, opacity: 0.7 });
+    const lines = new THREE.LineSegments(lineGeo, lineMat);
+    world.add(lines);
+
+    const CORE_COUNT = 10;
+    const CORE_RADIUS = 1.6;
+    const corePositions = new Float32Array(CORE_COUNT * 3);
+    for (let i = 0; i < CORE_COUNT; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos((Math.random() * 2) - 1);
+      const r = CORE_RADIUS * (0.5 + Math.random() * 0.5);
+      corePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      corePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      corePositions[i * 3 + 2] = r * Math.cos(phi);
+    }
+    const coreGeo = new THREE.BufferGeometry();
+    coreGeo.setAttribute('position', new THREE.BufferAttribute(corePositions, 3));
+    const coreMat = new THREE.PointsMaterial({ color: 0x5FF0D4, size: 0.16, transparent: true, opacity: 0.95 });
+    const corePoints = new THREE.Points(coreGeo, coreMat);
+    world.add(corePoints);
+
+    const pulseGeo = new THREE.BufferGeometry();
+    const pulsePositions = new Float32Array(6);
+    pulseGeo.setAttribute('position', new THREE.BufferAttribute(pulsePositions, 3));
+    const pulseMat = new THREE.LineBasicMaterial({ color: 0xFF6B4A, transparent: true, opacity: 0 });
+    const pulseLine = new THREE.Line(pulseGeo, pulseMat);
+    world.add(pulseLine);
+
+    let pulseStart = 0;
+    const PULSE_EVERY = 900;
+    const PULSE_DURATION = 550;
+
+    function firePulse(now) {
+      const fieldIdx = Math.floor(Math.random() * FIELD_COUNT);
+      const coreIdx = Math.floor(Math.random() * CORE_COUNT);
+      pulsePositions[0] = fieldPositions[fieldIdx * 3];
+      pulsePositions[1] = fieldPositions[fieldIdx * 3 + 1];
+      pulsePositions[2] = fieldPositions[fieldIdx * 3 + 2];
+      pulsePositions[3] = corePositions[coreIdx * 3];
+      pulsePositions[4] = corePositions[coreIdx * 3 + 1];
+      pulsePositions[5] = corePositions[coreIdx * 3 + 2];
+      pulseGeo.attributes.position.needsUpdate = true;
+      pulseStart = now;
+    }
+
+    function updateLinks() {
+      let vertIndex = 0;
+      for (let i = 0; i < FIELD_COUNT && vertIndex < maxLineVerts - 2; i++) {
+        const ax = fieldPositions[i * 3], ay = fieldPositions[i * 3 + 1], az = fieldPositions[i * 3 + 2];
+        for (let j = i + 1; j < FIELD_COUNT && vertIndex < maxLineVerts - 2; j++) {
+          const bx = fieldPositions[j * 3], by = fieldPositions[j * 3 + 1], bz = fieldPositions[j * 3 + 2];
+          const dx = ax - bx, dy = ay - by, dz = az - bz;
+          if (dx * dx + dy * dy + dz * dz < LINK_DIST * LINK_DIST) {
+            linePositions[vertIndex * 3] = ax;
+            linePositions[vertIndex * 3 + 1] = ay;
+            linePositions[vertIndex * 3 + 2] = az;
+            linePositions[(vertIndex + 1) * 3] = bx;
+            linePositions[(vertIndex + 1) * 3 + 1] = by;
+            linePositions[(vertIndex + 1) * 3 + 2] = bz;
+            vertIndex += 2;
+          }
+        }
+      }
+      lineGeo.setDrawRange(0, vertIndex);
+      lineGeo.attributes.position.needsUpdate = true;
+    }
+
+    let lastPulseCheck = performance.now();
+    let mouseX = 0, mouseY = 0;
+    window.addEventListener('mousemove', (e) => {
+      mouseX = (e.clientX / window.innerWidth - 0.5);
+      mouseY = (e.clientY / window.innerHeight - 0.5);
+    });
+
+    // Drag to orbit the scene, click (no drag) to fire an instant pulse —
+    // scoped to the canvas itself so the text panel and button underneath
+    // still behave like normal clickable elements.
+    let isDragging = false;
+    let dragMoved = false;
+    let lastPointerX = 0, lastPointerY = 0;
+    let dragRotationY = 0, dragRotationX = 0;
+
+    canvas.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      dragMoved = false;
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - lastPointerX;
+      const dy = e.clientY - lastPointerY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
+      dragRotationY += dx * 0.005;
+      dragRotationX += dy * 0.005;
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (isDragging && !dragMoved) {
+        firePulse(performance.now());
+        lastPulseCheck = performance.now();
+      }
+      isDragging = false;
+    });
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+
+      for (let i = 0; i < FIELD_COUNT; i++) {
+        fieldPositions[i * 3] += fieldVelocities[i].x;
+        fieldPositions[i * 3 + 1] += fieldVelocities[i].y;
+        fieldPositions[i * 3 + 2] += fieldVelocities[i].z;
+        for (let axis = 0; axis < 3; axis++) {
+          const limit = axis === 1 ? SPREAD * 0.7 : SPREAD;
+          if (Math.abs(fieldPositions[i * 3 + axis]) > limit) {
+            fieldVelocities[i].setComponent(axis, -fieldVelocities[i].getComponent(axis));
+          }
+        }
+      }
+      fieldGeo.attributes.position.needsUpdate = true;
+      updateLinks();
+
+      world.rotation.y += 0.0035 + dragRotationY * 0.06;
+      world.rotation.x += dragRotationX * 0.06;
+      dragRotationY *= 0.9;
+      dragRotationX *= 0.9;
+      corePoints.rotation.y -= 0.01;
+      corePoints.rotation.x += 0.006;
+
+      if (now - lastPulseCheck > PULSE_EVERY) {
+        firePulse(now);
+        lastPulseCheck = now;
+      }
+      const pulseElapsed = now - pulseStart;
+      if (pulseElapsed >= 0 && pulseElapsed < PULSE_DURATION) {
+        pulseMat.opacity = Math.sin((pulseElapsed / PULSE_DURATION) * Math.PI) * 0.9;
+      } else {
+        pulseMat.opacity = 0;
+      }
+
+      camera.position.x += (mouseX * 3 - camera.position.x) * 0.03;
+      camera.position.y += (-mouseY * 2 - camera.position.y) * 0.03;
+      camera.lookAt(0, 0, 0);
+
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(animate);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  }
+</script>
+
+</body>
+</html>
